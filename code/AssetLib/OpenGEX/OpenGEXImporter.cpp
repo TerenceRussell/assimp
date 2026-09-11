@@ -2,7 +2,7 @@
 Open Asset Import Library (assimp)
 ----------------------------------------------------------------------
 
-Copyright (c) 2006-2025, assimp team
+Copyright (c) 2006-2026, assimp team
 
 All rights reserved.
 
@@ -892,7 +892,7 @@ void OpenGEXImporter::handleIndexArrayNode(ODDLParser::DDLNode *node, aiScene * 
     m_currentMesh->mVertices = new aiVector3D[m_currentMesh->mNumVertices];
     bool hasColors(false);
     if (m_currentVertices.m_numColors > 0) {
-        m_currentMesh->mColors[0] = new aiColor4D[m_currentVertices.m_numColors];
+        m_currentMesh->mColors[0] = new aiColor4D[m_currentMesh->mNumVertices];
         hasColors = true;
     }
     bool hasNormalCoords(false);
@@ -913,12 +913,18 @@ void OpenGEXImporter::handleIndexArrayNode(ODDLParser::DDLNode *node, aiScene * 
         current.mIndices = new unsigned int[current.mNumIndices];
         Value *next(vaList->m_dataList);
         for (size_t indices = 0; indices < current.mNumIndices; indices++) {
-            const int idx(next->getUnsignedInt32());
+            int idx = -1;
+            if (next->m_type == Value::ValueType::ddl_unsigned_int16) {
+                idx = next->getUnsignedInt16();
+            } else if (next->m_type == Value::ValueType::ddl_unsigned_int32) {
+                idx = next->getUnsignedInt32();
+            }
+            
             ai_assert(static_cast<size_t>(idx) <= m_currentVertices.m_vertices.size());
             ai_assert(index < m_currentMesh->mNumVertices);
             aiVector3D &pos = (m_currentVertices.m_vertices[idx]);
             m_currentMesh->mVertices[index].Set(pos.x, pos.y, pos.z);
-            if (hasColors) {
+            if (hasColors && static_cast<size_t>(idx) < m_currentVertices.m_numColors) {
                 aiColor4D &col = m_currentVertices.m_colors[idx];
                 m_currentMesh->mColors[0][index] = col;
             }

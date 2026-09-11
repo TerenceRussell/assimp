@@ -3,7 +3,7 @@
 Open Asset Import Library (assimp)
 ---------------------------------------------------------------------------
 
-Copyright (c) 2006-2025, assimp team
+Copyright (c) 2006-2026, assimp team
 
 All rights reserved.
 
@@ -99,6 +99,10 @@ void ProcessFaceEdgesAndVertices(const NDOImporter::Object& obj,
 {
     unsigned int cur_edge = start_edge;
     do {
+        if (cur_edge >= obj.edges.size()) {
+            ASSIMP_LOG_WARN("NDOImporter: cur_edge is out of bounds, skipping invalid access.");
+            break;
+        }
         unsigned int next_edge, next_vert;
         if (key == obj.edges[cur_edge].edge[3]) {
             next_edge = obj.edges[cur_edge].edge[5];

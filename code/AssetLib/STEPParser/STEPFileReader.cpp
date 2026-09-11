@@ -2,7 +2,7 @@
 Open Asset Import Library (assimp)
 ----------------------------------------------------------------------
 
-Copyright (c) 2006-2025, assimp team
+Copyright (c) 2006-2026, assimp team
 
 All rights reserved.
 
@@ -404,7 +404,7 @@ std::shared_ptr<const EXPRESS::DataType> EXPRESS::DataType::Parse(const char*& i
     for(;*cur  && *cur != ',' && *cur != ')' && !IsSpace(*cur);++cur) {
         if (*cur == '.') {
             double f;
-            inout = fast_atoreal_move<double>(start,f);
+            inout = fast_atoreal_move(start,f);
             return std::make_shared<EXPRESS::REAL>(f);
         }
     }
@@ -434,7 +434,7 @@ std::shared_ptr<const EXPRESS::LIST> EXPRESS::LIST::Parse(const char*& inout, co
 
     // estimate the number of items upfront - lists can grow large
     size_t count = 1;
-    for(const char* c=cur; *c && *c != ')'; ++c) {
+    for(const char* c=cur; *c && c != end && *c != ')'; ++c) {
         count += (*c == ',' ? 1 : 0);
     }
 

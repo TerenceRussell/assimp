@@ -2,7 +2,7 @@
 Open Asset Import Library (assimp)
 ----------------------------------------------------------------------
 
-Copyright (c) 2006-2025, assimp team
+Copyright (c) 2006-2026, assimp team
 
 All rights reserved.
 
@@ -53,6 +53,11 @@ namespace glTF2 {
     using rapidjson::StringRef;
 
     namespace {
+
+        inline bool IsBasisUniversalMimeType(const std::string &mime_type)
+        {
+            return mime_type == "image/ktx2";
+        }
 
         template<typename T, size_t N>
         inline Value& MakeValue(Value& val, T(&r)[N], MemoryPoolAllocator<>& al) {
@@ -268,6 +273,9 @@ namespace glTF2 {
             }
 
             obj.AddMember("uri", Value(uri, w.mAl).Move(), w.mAl);
+            if (!img.mimeType.empty()) {
+                obj.AddMember("mimeType", Value(img.mimeType, w.mAl).Move(), w.mAl);
+            }
         }
     }
 
@@ -817,7 +825,18 @@ namespace glTF2 {
     inline void Write(Value& obj, Texture& tex, AssetWriter& w)
     {
         if (tex.source) {
-            obj.AddMember("source", tex.source->index, w.mAl);
+            if (IsBasisUniversalMimeType(tex.source->mimeType)) {
+                Value basisu;
+                basisu.SetObject();
+                basisu.AddMember("source", tex.source->index, w.mAl);
+
+                Value extensions;
+                extensions.SetObject();
+                extensions.AddMember("KHR_texture_basisu", basisu, w.mAl);
+                obj.AddMember("extensions", extensions, w.mAl);
+            } else {
+                obj.AddMember("source", tex.source->index, w.mAl);
+            }
         }
         if (tex.sampler) {
             obj.AddMember("sampler", tex.sampler->index, w.mAl);

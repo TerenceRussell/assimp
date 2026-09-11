@@ -3,7 +3,7 @@
 Open Asset Import Library (assimp)
 ---------------------------------------------------------------------------
 
-Copyright (c) 2006-2025, assimp team
+Copyright (c) 2006-2026, assimp team
 
 All rights reserved.
 
@@ -172,4 +172,12 @@ TEST_F(utASEImportExport, importUVTransform_ScaleUV2x_Rotate45) {
     const aiScene *scene = importer.ReadFile(ASSIMP_TEST_MODELS_DIR "/ASE/TestUVTransform/UVTransform_ScaleUV2x_Rotate45.ASE", aiProcess_ValidateDataStructure);
 
     ASSERT_NE(nullptr, scene);
+}
+
+
+TEST_F(utASEImportExport, importInvalidUVIndex) {
+    ::Assimp::Importer importer;
+    const aiScene *scene = importer.ReadFile(ASSIMP_TEST_MODELS_DIR "/ASE/invalid/InvalidUVIndex.ase", aiProcess_ValidateDataStructure);
+
+    EXPECT_EQ(nullptr, scene);
 }

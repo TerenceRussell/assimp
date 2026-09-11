@@ -2,7 +2,7 @@
 Open Asset Import Library (assimp)
 ----------------------------------------------------------------------
 
-Copyright (c) 2006-2025, assimp team
+Copyright (c) 2006-2026, assimp team
 
 All rights reserved.
 
@@ -602,7 +602,7 @@ struct Vertex_MDL7
     union {
         uint8_t norm162index;
         float norm[3];
-    };
+    } PACK_STRUCT;
 } PACK_STRUCT;
 
 // -------------------------------------------------------------------------------------
@@ -634,7 +634,7 @@ struct Frame_MDL7
     char    frame_name[AI_MDL7_MAX_FRAMENAMESIZE];
     uint32_t    vertices_count;
     uint32_t    transmatrix_count;
-};
+} PACK_STRUCT;
 
 
 // -------------------------------------------------------------------------------------

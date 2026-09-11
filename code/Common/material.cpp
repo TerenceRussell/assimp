@@ -2,7 +2,7 @@
 Open Asset Import Library (assimp)
 ----------------------------------------------------------------------
 
-Copyright (c) 2006-2025, assimp team
+Copyright (c) 2006-2026, assimp team
 
 All rights reserved.
 
@@ -98,6 +98,10 @@ const char *aiTextureTypeToString(aiTextureType in) {
         return "MayaSpecularColor";
     case aiTextureType_MAYA_SPECULAR_ROUGHNESS:
         return "MayaSpecularRoughness";
+    case aiTextureType_ANISOTROPY:
+        return "Anisotropy";
+    case aiTextureType_GLTF_METALLIC_ROUGHNESS:
+        return "glTFMetallicRoughness";
     case aiTextureType_UNKNOWN:
         return "Unknown";
     default:

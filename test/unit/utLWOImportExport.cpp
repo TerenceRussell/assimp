@@ -3,7 +3,7 @@
 Open Asset Import Library (assimp)
 ---------------------------------------------------------------------------
 
-Copyright (c) 2006-2025, assimp team
+Copyright (c) 2006-2026, assimp team
 
 All rights reserved.
 
@@ -384,6 +384,25 @@ TEST_F(utLWOImportExport, importLWOBsphere_with_mat_gloss_10pc) {
 TEST_F(utLWOImportExport, importLWOBsphere_with_mat_gloss_50pc) {
     ::Assimp::Importer importer;
     const aiScene *scene = importer.ReadFile(ASSIMP_TEST_MODELS_DIR "/LWO/LWOB/sphere_with_mat_gloss_50pc.lwo", aiProcess_ValidateDataStructure);
+
+    EXPECT_NE(nullptr, scene);
+}
+
+
+// A POLS chunk placed before PNTS leaves the point list empty while face
+// indices are clamped, which used to underflow to 0xFFFFFFFF and read wildly
+// out of bounds once a later PNTS enabled mesh conversion.
+TEST_F(utLWOImportExport, importLWO2FaceIndexBeforePoints) {
+    ::Assimp::Importer importer;
+    const aiScene *scene = importer.ReadFile(ASSIMP_TEST_MODELS_DIR "/LWO/LWO2/invalid/IndexUnderflow.lwo", aiProcess_ValidateDataStructure);
+
+    EXPECT_NE(nullptr, scene);
+}
+
+
+TEST_F(utLWOImportExport, importLWOBFaceIndexBeforePoints) {
+    ::Assimp::Importer importer;
+    const aiScene *scene = importer.ReadFile(ASSIMP_TEST_MODELS_DIR "/LWO/LWOB/invalid/IndexUnderflow.lwo", aiProcess_ValidateDataStructure);
 
     EXPECT_NE(nullptr, scene);
 }

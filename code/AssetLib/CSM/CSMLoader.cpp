@@ -3,7 +3,7 @@
 Open Asset Import Library (assimp)
 ---------------------------------------------------------------------------
 
-Copyright (c) 2006-2025, assimp team
+Copyright (c) 2006-2026, assimp team
 
 All rights reserved.
 
@@ -118,10 +118,11 @@ void CSMImporter::InternReadFile( const std::string& pFile,
     // now process the file and look out for '$' sections
     while (true) {
         SkipSpaces(&buffer, end);
-        if ('\0' == *buffer)
+        if ('\0' == *buffer) {
             break;
+        }
 
-        if ('$'  == *buffer)    {
+        if ('$'  == *buffer) {
             ++buffer;
             if (TokenMatchI(buffer,"firstframe",10)) {
                 SkipSpaces(&buffer, end);
@@ -134,7 +135,7 @@ void CSMImporter::InternReadFile( const std::string& pFile,
             else if (TokenMatchI(buffer,"rate",4))  {
                 SkipSpaces(&buffer, end);
                 float d = { 0.0f };
-                buffer = fast_atoreal_move<float>(buffer,d);
+                buffer = fast_atoreal_move(buffer,d);
                 anim->mTicksPerSecond = d;
             }
             else if (TokenMatchI(buffer,"order",5)) {
@@ -149,8 +150,9 @@ void CSMImporter::InternReadFile( const std::string& pFile,
                     anims_temp.push_back(new aiNodeAnim());
                     aiNodeAnim* nda = anims_temp.back();
 
-                    char* ot = nda->mNodeName.data;
-                    while (!IsSpaceOrNewLine(*buffer) && buffer != end) {
+                    char *ot = nda->mNodeName.data;
+                    const char *ot_end = nda->mNodeName.data + AI_MAXLEN;
+                    while (!IsSpaceOrNewLine(*buffer) && buffer != end && ot != ot_end) {
                         *ot++ = *buffer++;
                     }
 
@@ -173,15 +175,26 @@ void CSMImporter::InternReadFile( const std::string& pFile,
 
                 // If we know how many frames we'll read, we can preallocate some storage
                 unsigned int alloc = 100;
-                if (last != 0x00ffffff) {
+                if (last != 0x00ffffff && last > first) {
+                    // re-init if the file has last frame data
                     alloc = last-first;
                     alloc += alloc>>2u; // + 25%
                     for (unsigned int i = 0; i < anim->mNumChannels; ++i) {
+                        if (anim->mChannels[i]->mPositionKeys != nullptr) delete[] anim->mChannels[i]->mPositionKeys;
+                        anim->mChannels[i]->mPositionKeys = new aiVectorKey[alloc];
+                    }
+                } else {
+                    // default init
+                    for (unsigned int i = 0; i < anim->mNumChannels; ++i) {
+                        if (anim->mChannels[i]->mPositionKeys != nullptr) continue;
                         anim->mChannels[i]->mPositionKeys = new aiVectorKey[alloc];
                     }
                 }
 
-                unsigned int filled = 0;
+                // Track every channel's own buffer capacity. A single shared counter
+                // is not enough: a DROPOUT marker makes a channel skip a frame, so the
+                // channels' key counts drift apart and each buffer has to grow on its own.
+                std::vector<unsigned int> capacity(anim->mNumChannels, alloc);
 
                 // Now read all point data.
                 while (true) {
@@ -197,12 +210,13 @@ void CSMImporter::InternReadFile( const std::string& pFile,
                     for (unsigned int i = 0; i < anim->mNumChannels;++i)    {
 
                         aiNodeAnim* s = anim->mChannels[i];
-                        if (s->mNumPositionKeys == alloc)   {
-                            // need to reallocate?
+                        if (s->mNumPositionKeys == capacity[i])   {
+                            // this channel's buffer is full, grow it
                             aiVectorKey* old = s->mPositionKeys;
-                            s->mPositionKeys = new aiVectorKey[s->mNumPositionKeys = alloc*2];
-                            ::memcpy(s->mPositionKeys,old,sizeof(aiVectorKey)*alloc);
+                            s->mPositionKeys = new aiVectorKey[capacity[i]*2];
+                            ::memcpy(s->mPositionKeys,old,sizeof(aiVectorKey)*capacity[i]);
                             delete[] old;
+                            capacity[i] *= 2;
                         }
 
                         // read x,y,z
@@ -216,28 +230,21 @@ void CSMImporter::InternReadFile( const std::string& pFile,
                         } else {
                             aiVectorKey* sub = s->mPositionKeys + s->mNumPositionKeys;
                             sub->mTime = (double)frame;
-                            buffer = fast_atoreal_move<float>(buffer, (float&)sub->mValue.x);
+                            buffer = fast_atoreal_move(buffer, sub->mValue.x);
 
                             if (!SkipSpacesAndLineEnd(&buffer, end)) {
                                 throw DeadlyImportError("CSM: Unexpected EOF occurred reading sample y coord");
                             }
-                            buffer = fast_atoreal_move<float>(buffer, (float&)sub->mValue.y);
+                            buffer = fast_atoreal_move(buffer, sub->mValue.y);
 
                             if (!SkipSpacesAndLineEnd(&buffer, end)) {
                                 throw DeadlyImportError("CSM: Unexpected EOF occurred reading sample z coord");
                             }
-                            buffer = fast_atoreal_move<float>(buffer, (float&)sub->mValue.z);
+                            buffer = fast_atoreal_move(buffer, sub->mValue.z);
 
                             ++s->mNumPositionKeys;
                         }
                     }
-
-                    // update allocation granularity
-                    if (filled == alloc) {
-                        alloc *= 2;
-                    }
-
-                    ++filled;
                 }
                 // all channels must be complete in order to continue safely.
                 for (unsigned int i = 0; i < anim->mNumChannels;++i)    {
@@ -269,7 +276,13 @@ void CSMImporter::InternReadFile( const std::string& pFile,
         nd->mName   = anim->mChannels[i]->mNodeName;
         nd->mParent = pScene->mRootNode;
 
-        aiMatrix4x4::Translation(na->mPositionKeys[0].mValue, nd->mTransformation);
+        if (na->mPositionKeys != nullptr && na->mNumPositionKeys > 0) {
+            aiMatrix4x4::Translation(na->mPositionKeys[0].mValue, nd->mTransformation);
+        } else {
+            // Use identity matrix if no valid position data is available
+            nd->mTransformation = aiMatrix4x4();
+            DefaultLogger::get()->warn("CSM: No position keys available for node - using identity transformation");
+        }
     }
 
     // Store the one and only animation in the scene

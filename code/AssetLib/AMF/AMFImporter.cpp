@@ -3,7 +3,7 @@
 Open Asset Import Library (assimp)
 ---------------------------------------------------------------------------
 
-Copyright (c) 2006-2025, assimp team
+Copyright (c) 2006-2026, assimp team
 
 All rights reserved.
 
@@ -113,10 +113,10 @@ bool AMFImporter::Find_NodeElement(const std::string &pID, const AMFNodeElementB
 
 bool AMFImporter::Find_ConvertedNode(const std::string &pID, NodeArray &nodeArray, aiNode **pNode) const {
     aiString node_name(pID.c_str());
-    for (aiNode *node : nodeArray) {
+    for (std::unique_ptr<aiNode> &node : nodeArray) {
         if (node->mName == node_name) {
             if (pNode != nullptr) {
-                *pNode = node;
+                *pNode = node.get();
             }
 
             return true;
@@ -327,8 +327,7 @@ void AMFImporter::ParseNode_Root() {
 // Multi elements - Yes.
 // Parent element - <amf>.
 void AMFImporter::ParseNode_Constellation(XmlNode &node) {
-    std::string id;
-    id = node.attribute("id").as_string();
+    std::string id = node.attribute("id").as_string();
 
     // create and if needed - define new grouping object.
     AMFNodeElementBase *ne = new AMFConstellation(mNodeElement_Cur);

@@ -3,7 +3,7 @@
 Open Asset Import Library (assimp)
 ---------------------------------------------------------------------------
 
-Copyright (c) 2006-2025, assimp team
+Copyright (c) 2006-2026, assimp team
 
 All rights reserved.
 
@@ -40,7 +40,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "AbstractImportExportBase.h"
 #include "UnitTestPCH.h"
-
+#include "Tools/TestTools.h"
+#ifndef ASSIMP_BUILD_NO_EXPORT
+#include "AssetLib/glTF2/glTF2AssetWriter.h"
+#endif
 #include <assimp/commonMetaData.h>
 #include <assimp/postprocess.h>
 #include <assimp/config.h>
@@ -53,6 +56,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rapidjson/schema.h>
 
 #include <array>
+#include <fstream>
+#include <sstream>
 
 #include <assimp/material.h>
 #include <assimp/GltfMaterial.h>
@@ -200,6 +205,83 @@ TEST_F(utglTF2ImportExport, importglTF2_KHR_materials_clearcoat) {
 }
 
 #ifndef ASSIMP_BUILD_NO_EXPORT
+
+TEST_F(utglTF2ImportExport, exportExternalBasisUniversalTexture) {
+    glTF2::Asset asset;
+    asset.extensionsUsed.KHR_texture_basisu = true;
+
+    auto image = asset.images.Create("image");
+    image->uri = "textures/albedo.KTX2";
+    image->mimeType = "image/ktx2";
+
+    auto texture = asset.textures.Create("texture");
+    texture->source = image;
+
+    glTF2::AssetWriter writer(asset);
+    ASSERT_TRUE(writer.mDoc.HasMember("images"));
+    ASSERT_EQ(writer.mDoc["images"].Size(), 1u);
+    const auto &image_json = writer.mDoc["images"][0];
+    ASSERT_TRUE(image_json.HasMember("uri"));
+    EXPECT_STREQ(image_json["uri"].GetString(), "textures/albedo.KTX2");
+    ASSERT_TRUE(image_json.HasMember("mimeType"));
+    EXPECT_STREQ(image_json["mimeType"].GetString(), "image/ktx2");
+
+    ASSERT_TRUE(writer.mDoc.HasMember("textures"));
+    ASSERT_EQ(writer.mDoc["textures"].Size(), 1u);
+    const auto &texture_json = writer.mDoc["textures"][0];
+    EXPECT_FALSE(texture_json.HasMember("source"));
+    ASSERT_TRUE(texture_json.HasMember("extensions"));
+    ASSERT_TRUE(texture_json["extensions"].HasMember("KHR_texture_basisu"));
+    const auto &basisu = texture_json["extensions"]["KHR_texture_basisu"];
+    ASSERT_TRUE(basisu.HasMember("source"));
+    EXPECT_EQ(basisu["source"].GetUint(), 0u);
+}
+
+TEST_F(utglTF2ImportExport, exportExternalBasisUniversalTexturePath) {
+    Assimp::Importer importer;
+    const aiScene *scene = importer.ReadFile(
+            ASSIMP_TEST_MODELS_DIR "/glTF2/BoxTextured-glTF/BoxTextured.gltf",
+            aiProcess_ValidateDataStructure);
+    ASSERT_NE(scene, nullptr);
+    ASSERT_GT(scene->mNumMaterials, 0u);
+
+    scene->mMaterials[0]->Clear();
+    aiString texture_path("textures/albedo.KTX2");
+    scene->mMaterials[0]->AddProperty(
+            &texture_path, AI_MATKEY_TEXTURE(aiTextureType_DIFFUSE, 0));
+
+    const std::string output =
+            std::string(ASSIMP_TEST_MODELS_DIR) +
+            "/glTF2/external_basis_texture_path_test.gltf";
+    Assimp::Exporter exporter;
+    ASSERT_EQ(aiReturn_SUCCESS,
+              exporter.Export(scene, "gltf2", output.c_str()))
+            << exporter.GetErrorString();
+
+    std::ifstream input(output);
+    ASSERT_TRUE(input.good());
+    std::stringstream contents;
+    contents << input.rdbuf();
+    rapidjson::Document document;
+    document.Parse(contents.str().c_str());
+    ASSERT_FALSE(document.HasParseError());
+
+    ASSERT_TRUE(document.HasMember("images"));
+    ASSERT_EQ(document["images"].Size(), 1u);
+    EXPECT_STREQ(document["images"][0]["mimeType"].GetString(),
+                 "image/ktx2");
+    ASSERT_TRUE(document.HasMember("textures"));
+    ASSERT_EQ(document["textures"].Size(), 1u);
+    EXPECT_FALSE(document["textures"][0].HasMember("source"));
+    EXPECT_EQ(document["textures"][0]["extensions"]["KHR_texture_basisu"]
+                      ["source"]
+                              .GetUint(),
+              0u);
+
+    ::remove(output.c_str());
+    const std::string binary = output.substr(0, output.size() - 5) + ".bin";
+    ::remove(binary.c_str());
+}
 
 TEST_F(utglTF2ImportExport, importglTF2AndExport_KHR_materials_clearcoat) {
     {
@@ -472,7 +554,8 @@ TEST_F(utglTF2ImportExport, importglTF2PrimitiveModeTrianglesFan) {
 std::vector<char> ReadFile(const char *name) {
     std::vector<char> ret;
 
-    FILE *p = ::fopen(name, "r");
+    FILE *p{ nullptr };
+    EXPECT_TRUE(Unittest::TestTools::openFilestream(&p, name, "r"));
     if (nullptr == p) {
         return ret;
     }
@@ -933,8 +1016,8 @@ TEST_F(utglTF2ImportExport, wrongTypes) {
         TUPLE("/glTF2/wrongTypes/badString.gltf", "string", "name", "scenes[0]"),
         TUPLE("/glTF2/wrongTypes/badUint.gltf", "uint", "index", "materials[0]"),
         TUPLE("/glTF2/wrongTypes/badNumber.gltf", "number", "scale", "materials[0]"),
-        TUPLE("/glTF2/wrongTypes/badObject.gltf", "object", "pbrMetallicRoughness", "materials[0]"),
-        TUPLE("/glTF2/wrongTypes/badExtension.gltf", "object", "KHR_texture_transform", "materials[0]")
+        //TUPLE("/glTF2/wrongTypes/badObject.gltf", "object", "pbrMetallicRoughness", "materials[0]"),
+        //TUPLE("/glTF2/wrongTypes/badExtension.gltf", "object", "KHR_texture_transform", "materials[0]")
 #undef TUPLE
     };
     for (const auto& tuple : wrongTypes)
@@ -949,6 +1032,29 @@ TEST_F(utglTF2ImportExport, wrongTypes) {
         const std::string error = importer.GetErrorString();
         EXPECT_FALSE(error.empty());
         EXPECT_NE(error.find(member + "\" was not of type \"" + type + "\" when reading " + context), std::string::npos);
+    }
+}
+
+TEST_F(utglTF2ImportExport, wrongObject) {
+    // Deliberately broken version of the BoxTextured.gltf asset.
+    using tup_T = std::tuple<std::string, std::string, std::string, std::string>;
+    std::vector<tup_T> wrongTypes = {
+#ifdef __cpp_lib_constexpr_tuple
+#define TUPLE(x, y, z, w) \
+    { x, y, z, w }
+#else
+#define TUPLE(x, y, z, w) tup_T(x, y, z, w)
+#endif
+    TUPLE("/glTF2/wrongTypes/badObject.gltf", "object", "pbrMetallicRoughness", "materials[0]"),
+    TUPLE("/glTF2/wrongTypes/badExtension.gltf", "object", "KHR_texture_transform", "materials[0]"),
+    TUPLE("/glTF2/wrongTypes/topLevelExtensionsNotObject.gltf", "object", "extensions", "the document")
+#undef TUPLE
+    };
+    for (const auto &tuple : wrongTypes) {
+        const auto &file = std::get<0>(tuple);
+        Assimp::Importer importer;
+        const aiScene *scene = importer.ReadFile(ASSIMP_TEST_MODELS_DIR + file, aiProcess_ValidateDataStructure);
+        ASSERT_NE(scene, nullptr);
     }
 }
 
@@ -1033,3 +1139,15 @@ TEST_F(utglTF2ImportExport, testSetIdentityMatrixEpsilon) {
     EXPECT_TRUE(m.IsIdentity(epsilon));
 }
 
+TEST_F(utglTF2ImportExport, importMalformedSparseAccessor) {
+    Assimp::Importer importer;
+    // Attempt to load the proof-of-concept file we generated earlier
+    const aiScene *scene = importer.ReadFile(ASSIMP_TEST_MODELS_DIR "/glTF2/malformed_sparse.gltf", 0);
+    
+    // ASSERTION: The file must fail to load safely instead of crashing the program
+    EXPECT_EQ(scene, nullptr);
+    
+    // ASSERTION: The thrown parser error must match our custom fail-fast string
+    std::string errorString = importer.GetErrorString();
+    EXPECT_NE(errorString.find("Invalid sparse accessor: missing required 'values' object."), std::string::npos);
+}

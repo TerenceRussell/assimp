@@ -3,7 +3,7 @@
 Open Asset Import Library (assimp)
 ---------------------------------------------------------------------------
 
-Copyright (c) 2006-2025, assimp team
+Copyright (c) 2006-2026, assimp team
 
 
 
@@ -232,7 +232,6 @@ bool CalcTangentsProcess::ProcessMesh(aiMesh *pMesh, unsigned int meshIndex) {
             std::pair<SpatialSort, float> &blubb = avf->operator[](meshIndex);
             vertexFinder = &blubb.first;
             posEpsilon = blubb.second;
-            ;
         }
     }
     if (!vertexFinder) {
@@ -295,5 +294,6 @@ bool CalcTangentsProcess::ProcessMesh(aiMesh *pMesh, unsigned int meshIndex) {
             meshBitang[closeVertices[b]] = smoothBitangent;
         }
     }
+
     return true;
 }
